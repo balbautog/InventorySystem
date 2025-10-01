@@ -17,35 +17,69 @@
     }
     form {
       background: #111;
-      padding: 20px;
-      border-radius: 8px;
+      padding: 40px 30px;
+      border-radius: 12px;
       border: 1px solid #fff;
-      width: 300px;
+      width: 320px;
+      box-shadow: 0 0 20px #222;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h2 {
+      margin-bottom: 25px;
+      font-weight: normal;
+      color: #fff;
     }
     input {
-      display: block;
       width: 100%;
       margin: 10px 0;
-      padding: 8px;
+      padding: 12px;
       border: 1px solid #fff;
+      border-radius: 6px;
       background: #000;
       color: #fff;
+      font-size: 14px;
+      transition: border 0.3s, box-shadow 0.3s;
+    }
+    input:focus {
+      border-color: #fff;
+      box-shadow: 0 0 5px #fff;
+      outline: none;
     }
     button {
       background: #fff;
       color: #000;
       border: none;
-      padding: 10px;
+      padding: 12px;
       cursor: pointer;
       font-weight: bold;
       width: 100%;
+      border-radius: 6px;
+      margin-top: 15px;
+      transition: background 0.3s;
     }
     button:hover {
       background: #ddd;
     }
     .message {
-      margin-top: 10px;
+      margin-top: 15px;
       font-size: 0.9em;
+      text-align: center;
+    }
+    p.register-link {
+      margin-top: 15px;
+      font-size: 0.9em;
+      text-align: center;
+      color: #ccc;
+    }
+    p.register-link a {
+      color: #fff;
+      font-weight: bold;
+      text-decoration: none;
+    }
+    p.register-link a:hover {
+      color: #ddd;
     }
   </style>
 </head>
@@ -56,6 +90,7 @@
     <input type="password" id="password" placeholder="Password" required>
     <button type="submit">Login</button>
     <div class="message" id="message"></div>
+    <p class="register-link">Don't have an account? <a href="register.html">Register</a></p>
   </form>
 
   <script>
@@ -64,9 +99,9 @@
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value.trim();
+      if (!username || !password) return;
 
       try {
         const res = await fetch("/.netlify/functions/login", {
@@ -74,18 +109,13 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username, password })
         });
-
         const data = await res.json();
 
         if (res.ok) {
           message.style.color = "lime";
           message.textContent = data.message;
-          // Save JWT in localStorage for later use
           localStorage.setItem("token", data.token);
-          // Redirect to dashboard (you’ll create this next)
-          setTimeout(() => {
-            window.location.href = "/dashboard.html";
-          }, 1000);
+          setTimeout(() => window.location.href = "/dashboard.html", 1000);
         } else {
           message.style.color = "red";
           message.textContent = data.error;
