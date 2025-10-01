@@ -25,23 +25,12 @@
       margin-left: 15px;
       font-weight: bold;
     }
-    nav a:hover { color: #ddd; }
-    main { padding: 20px; }
-    h2, h3 { margin-top: 20px; }
-    .cards {
-      display: flex;
-      gap: 20px;
-      margin-bottom: 20px;
+    nav a:hover {
+      color: #ddd;
     }
-    .card {
-      flex: 1;
-      background: #111;
+    main {
       padding: 20px;
-      border-radius: 10px;
-      text-align: center;
     }
-    .card h3 { margin: 0; font-size: 16px; color: #ccc; }
-    .card p { font-size: 24px; font-weight: bold; margin: 5px 0 0 0; }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -52,14 +41,21 @@
       padding: 8px;
       text-align: left;
     }
-    th { background: #111; }
-    canvas {
-      margin-top: 20px;
+    th {
       background: #111;
-      padding: 10px;
+    }
+    button {
+      background: #fff;
+      color: #000;
+      border: none;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover {
+      background: #ddd;
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <header>
@@ -74,27 +70,6 @@
 
   <main>
     <h2 id="welcomeMessage">Welcome!</h2>
-
-    <!-- SaaS-style Summary Cards -->
-    <div class="cards">
-      <div class="card">
-        <h3>Total Revenue</h3>
-        <p id="totalRevenue">₱0.00</p>
-      </div>
-      <div class="card">
-        <h3>Total Orders</h3>
-        <p id="totalOrders">0</p>
-      </div>
-      <div class="card">
-        <h3>Total Customers</h3>
-        <p id="totalCustomers">0</p>
-      </div>
-      <div class="card">
-        <h3>Average Order Value</h3>
-        <p id="averageOrderValue">₱0.00</p>
-      </div>
-    </div>
-
     <h3>Products</h3>
     <table id="productsTable">
       <thead>
@@ -105,48 +80,35 @@
           <th>Stock</th>
         </tr>
       </thead>
-      <tbody></tbody>
+      <tbody>
+        <!-- Products will be loaded here -->
+      </tbody>
     </table>
-
-    <h3>Revenue Over Time</h3>
-    <canvas id="revenueLineChart" width="400" height="200"></canvas>
-
-    <h3>Top Selling Products</h3>
-    <canvas id="topProductsChart" width="400" height="200"></canvas>
   </main>
 
   <script>
     const token = localStorage.getItem("token");
     const welcomeMessage = document.getElementById("welcomeMessage");
+    const productsTable = document.getElementById("productsTable").querySelector("tbody");
     const logoutBtn = document.getElementById("logoutBtn");
 
-    if (!token) window.location.href = "/login.html";
+    if (!token) {
+      window.location.href = "/login.html";
+    }
 
-    // Decode JWT for username
+    // Decode JWT to get username (simple parse)
     const payload = JSON.parse(atob(token.split(".")[1]));
     welcomeMessage.textContent = `Welcome, ${payload.username}!`;
 
-    logoutBtn.addEventListener("click", () => {
-      localStorage.removeItem("token");
-      window.location.href = "/login.html";
-    });
-
-    // Elements for summary cards
-    const totalRevenueEl = document.getElementById("totalRevenue");
-    const totalOrdersEl = document.getElementById("totalOrders");
-    const totalCustomersEl = document.getElementById("totalCustomers");
-    const averageOrderValueEl = document.getElementById("averageOrderValue");
-
-    // Products table
-    const productsTable = document.getElementById("productsTable").querySelector("tbody");
-
-    // Load products
+    // Fetch products from serverless function
     async function loadProducts() {
       try {
         const res = await fetch("/.netlify/functions/get-products", {
           headers: { "Authorization": `Bearer ${token}` }
         });
         const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to fetch products");
+
         productsTable.innerHTML = "";
         data.products.forEach(p => {
           const row = document.createElement("tr");
@@ -163,74 +125,13 @@
       }
     }
 
-    // Load dashboard analytics
-    async function loadAnalytics() {
-      try {
-        const res = await fetch("/.netlify/functions/get-dashboard-report", {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
-        const data = await res.json();
-
-        // Summary Cards
-        totalRevenueEl.textContent = `₱${data.totalRevenue.toFixed(2)}`;
-        totalOrdersEl.textContent = data.totalOrders;
-        totalCustomersEl.textContent = data.totalCustomers;
-        averageOrderValueEl.textContent = `₱${data.averageOrderValue.toFixed(2)}`;
-
-        // Revenue over time chart
-        const revenueCtx = document.getElementById("revenueLineChart").getContext("2d");
-        new Chart(revenueCtx, {
-          type: "line",
-          data: {
-            labels: data.revenueOverTime.map(r => r.date),
-            datasets: [{
-              label: "Revenue",
-              data: data.revenueOverTime.map(r => r.total),
-              backgroundColor: "#fff",
-              borderColor: "#fff",
-              fill: false,
-              tension: 0.1
-            }]
-          },
-          options: {
-            plugins: { legend: { labels: { color: "#fff" } } },
-            scales: {
-              x: { ticks: { color: "#fff" }, grid: { color: "#444" } },
-              y: { ticks: { color: "#fff" }, grid: { color: "#444" } }
-            }
-          }
-        });
-
-        // Top selling products chart
-        const topCtx = document.getElementById("topProductsChart").getContext("2d");
-        new Chart(topCtx, {
-          type: "bar",
-          data: {
-            labels: data.topProducts.map(p => p.name),
-            datasets: [{
-              label: "Quantity Sold",
-              data: data.topProducts.map(p => p.total_sold),
-              backgroundColor: "#fff",
-              borderColor: "#fff",
-              borderWidth: 1
-            }]
-          },
-          options: {
-            plugins: { legend: { labels: { color: "#fff" } } },
-            scales: {
-              x: { ticks: { color: "#fff" }, grid: { color: "#444" } },
-              y: { ticks: { color: "#fff" }, grid: { color: "#444" } }
-            }
-          }
-        });
-
-      } catch (err) {
-        alert(err.message);
-      }
-    }
-
     loadProducts();
-    loadAnalytics();
+
+    // Logout
+    logoutBtn.addEventListener("click", () => {
+      localStorage.removeItem("token");
+      window.location.href = "/login.html";
+    });
   </script>
 </body>
 </html>

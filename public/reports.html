@@ -13,14 +13,10 @@
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
     th, td { border: 1px solid #fff; padding: 8px; text-align: left; }
     th { background: #111; }
-    h2, h3 { margin-top: 20px; }
-    canvas { margin-top: 20px; background: #111; padding: 10px; }
-    p { font-size: 18px; }
-    button { background: #fff; color: #000; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; margin-top: 10px; margin-right: 10px; }
+    h2 { margin-top: 0; }
+    button { background: #fff; color: #000; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; margin-right: 5px; }
     button:hover { background: #ddd; }
-    input[type="date"], select { background: #000; color: #fff; border: 1px solid #fff; padding: 5px; margin-right: 5px; border-radius: 5px; }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <header>
@@ -37,17 +33,6 @@
     <h2>Sales Summary</h2>
     <p>Total Revenue: ₱<span id="totalRevenue">0.00</span></p>
 
-    <!-- Filters -->
-    <div>
-      <input type="date" id="startDate">
-      <input type="date" id="endDate">
-      <select id="productFilter">
-        <option value="">All Products</option>
-      </select>
-      <button id="filterBtn">Filter</button>
-      <button id="exportCSVBtn">Download CSV</button>
-    </div>
-
     <h3>Sales by Product</h3>
     <table id="reportTable">
       <thead>
@@ -59,12 +44,6 @@
       </thead>
       <tbody></tbody>
     </table>
-
-    <h3>Revenue per Product (Bar Chart)</h3>
-    <canvas id="revenueChart" width="400" height="200"></canvas>
-
-    <h3>Quantity Sold per Product (Pie Chart)</h3>
-    <canvas id="quantityChart" width="400" height="200"></canvas>
   </main>
 
   <script>
@@ -72,171 +51,38 @@
     if (!token) window.location.href = "/login.html";
 
     const logoutBtn = document.getElementById("logoutBtn");
-    const reportTable = document.getElementById("reportTable").querySelector("tbody");
-    const totalRevenueEl = document.getElementById("totalRevenue");
-    const filterBtn = document.getElementById("filterBtn");
-    const exportBtn = document.getElementById("exportCSVBtn");
-    const startDateInput = document.getElementById("startDate");
-    const endDateInput = document.getElementById("endDate");
-    const productFilter = document.getElementById("productFilter");
-
-    let reportData = null;
-
     logoutBtn.addEventListener("click", () => {
       localStorage.removeItem("token");
       window.location.href = "/login.html";
     });
 
-    async function loadProductsForFilter() {
+    const reportTable = document.getElementById("reportTable").querySelector("tbody");
+    const totalRevenueEl = document.getElementById("totalRevenue");
+
+    async function loadReport() {
       try {
-        const res = await fetch("/.netlify/functions/get-products", {
+        const res = await fetch("/.netlify/functions/get-report", {
           headers: { "Authorization": `Bearer ${token}` }
         });
-
-        const contentType = res.headers.get("content-type");
-        if (!res.ok || !contentType?.includes("application/json")) {
-          const text = await res.text();
-          console.error("Failed to load products:", text);
-          throw new Error("Failed to fetch products");
-        }
-
-        const data = await res.json();
-        data.products.forEach(p => {
-          const option = document.createElement("option");
-          option.value = p.name;
-          option.textContent = p.name;
-          productFilter.appendChild(option);
-        });
-      } catch (err) {
-        alert(err.message);
-      }
-    }
-
-    async function loadReport(startDate = null, endDate = null, productName = null) {
-      try {
-        let url = "/.netlify/functions/get-report";
-        const params = [];
-        if (startDate) params.push(`start=${startDate}`);
-        if (endDate) params.push(`end=${endDate}`);
-        if (productName) params.push(`product=${encodeURIComponent(productName)}`);
-        if (params.length) url += "?" + params.join("&");
-
-        const res = await fetch(url, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
-
-        const contentType = res.headers.get("content-type");
-        if (!res.ok || !contentType?.includes("application/json")) {
-          const text = await res.text();
-          console.error("Fetch failed or invalid JSON:", text);
-          throw new Error("Failed to fetch report data");
-        }
-
         const data = await res.json();
 
-        // Ensure numeric values
-        data.totalRevenue = Number(data.totalRevenue) || 0;
-        data.products.forEach(p => {
-          p.total_sold = Number(p.total_sold) || 0;
-          p.total_revenue = Number(p.total_revenue) || 0;
-        });
-
-        reportData = data;
-
-        // Populate table
         reportTable.innerHTML = "";
-        totalRevenueEl.textContent = data.totalRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        totalRevenueEl.textContent = data.totalRevenue.toFixed(2);
+
         data.products.forEach(p => {
           const row = document.createElement("tr");
           row.innerHTML = `
             <td>${p.name}</td>
-            <td>${p.total_sold.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-            <td>₱${p.total_revenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td>${p.total_sold}</td>
+            <td>₱${p.total_revenue.toFixed(2)}</td>
           `;
           reportTable.appendChild(row);
         });
-
-        renderCharts(data.products);
-
       } catch (err) {
         alert(err.message);
       }
     }
 
-    function renderCharts(products) {
-      if (window.revenueChartInstance) window.revenueChartInstance.destroy();
-      if (window.quantityChartInstance) window.quantityChartInstance.destroy();
-
-      const revenueCtx = document.getElementById('revenueChart').getContext('2d');
-      window.revenueChartInstance = new Chart(revenueCtx, {
-        type: 'bar',
-        data: {
-          labels: products.map(p => p.name),
-          datasets: [{
-            label: 'Revenue per Product',
-            data: products.map(p => p.total_revenue),
-            backgroundColor: '#fff',
-            borderColor: '#fff',
-            borderWidth: 1
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { labels: { color: '#fff' } } },
-          scales: {
-            x: { ticks: { color: '#fff' }, grid: { color: '#444' } },
-            y: { ticks: { color: '#fff' }, grid: { color: '#444' } }
-          }
-        }
-      });
-
-      const quantityCtx = document.getElementById('quantityChart').getContext('2d');
-      window.quantityChartInstance = new Chart(quantityCtx, {
-        type: 'pie',
-        data: {
-          labels: products.map(p => p.name),
-          datasets: [{
-            label: 'Quantity Sold',
-            data: products.map(p => p.total_sold),
-            backgroundColor: products.map(() => '#fff'),
-            borderColor: products.map(() => '#000'),
-            borderWidth: 1
-          }]
-        },
-        options: {
-          plugins: { legend: { labels: { color: '#fff' } } }
-        }
-      });
-    }
-
-    filterBtn.addEventListener("click", () => {
-      const start = startDateInput.value;
-      const end = endDateInput.value;
-      const productName = productFilter.value || null;
-      loadReport(start, end, productName);
-    });
-
-    // Enhanced CSV Export with formatted numbers
-    exportBtn.addEventListener("click", () => {
-      if (!reportData || !reportData.products) return alert("No data to export.");
-
-      const formatNumber = (num) => Number(num).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-      let csv = "Product,Total Sold,Total Revenue\n";
-      reportData.products.forEach(p => {
-        csv += `${p.name},${formatNumber(p.total_sold)},${formatNumber(p.total_revenue)}\n`;
-      });
-
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "sales_report.csv";
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-
-    loadProductsForFilter();
     loadReport();
   </script>
 </body>
