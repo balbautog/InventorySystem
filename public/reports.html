@@ -67,7 +67,7 @@
         const data = await res.json();
 
         reportTable.innerHTML = "";
-        totalRevenueEl.textContent = data.totalRevenue.toFixed(2);
+        totalRevenueEl.textContent = (Number(data.totalRevenue) || 0).toFixed(2);
 
         data.products.forEach(p => {
           const row = document.createElement("tr");
