@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sales</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #000; color: #fff; margin: 0; padding: 0; }
+    header { padding: 20px; border-bottom: 1px solid #fff; display: flex; justify-content: space-between; align-items: center; }
+    nav a { color: #fff; text-decoration: none; margin-left: 15px; font-weight: bold; }
+    nav a:hover { color: #ddd; }
+    main { padding: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #fff; padding: 8px; text-align: left; }
+    th { background: #111; }
+    input, select { padding: 5px; margin-right: 5px; background: #000; color: #fff; border: 1px solid #fff; }
+    button { background: #fff; color: #000; border: none; padding: 5px 10px; cursor: pointer; font-weight: bold; margin-right: 5px; }
+    button:hover { background: #ddd; }
+    .form-inline { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sales</h1>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="reports.html">Reports</a>
+      <a href="#" id="logoutBtn">Logout</a>
+    </nav>
+  </header>
+
+  <main>
+    <h2>Record a Sale</h2>
+    <div class="form-inline">
+      <select id="productSelect"></select>
+      <input type="number" id="saleQty" placeholder="Quantity" min="1" required>
+      <button id="addSaleBtn">Add Sale</button>
+    </div>
+
+    <h3>Recent Sales</h3>
+    <table id="salesTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Product</th>
+          <th>Quantity</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </main>
+
+  <script>
+    const token = localStorage.getItem("token");
+    if (!token) window.location.href = "/login.html";
+
+    const logoutBtn = document.getElementById("logoutBtn");
+    logoutBtn.addEventListener("click", () => {
+      localStorage.removeItem("token");
+      window.location.href = "/login.html";
+    });
+
+    const productSelect = document.getElementById("productSelect");
+    const saleQty = document.getElementById("saleQty");
+    const salesTable = document.getElementById("salesTable").querySelector("tbody");
+
+    async function loadProducts() {
+      const res = await fetch("/.netlify/functions/get-products", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+      productSelect.innerHTML = "";
+      data.products.forEach(p => {
+        productSelect.innerHTML += `<option value="${p.id}" data-stock="${p.stock}">${p.name} (Stock: ${p.stock})</option>`;
+      });
+    }
+
+    async function loadSales() {
+      const res = await fetch("/.netlify/functions/get-sales", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+      salesTable.innerHTML = "";
+      data.sales.forEach(s => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${s.id}</td>
+          <td>${s.product_name}</td>
+          <td>${s.quantity}</td>
+          <td>${new Date(s.created_at).toLocaleString()}</td>
+        `;
+        salesTable.appendChild(row);
+      });
+    }
+
+    document.getElementById("addSaleBtn").addEventListener("click", async () => {
+      const productId = parseInt(productSelect.value);
+      const quantity = parseInt(saleQty.value);
+      const stock = parseInt(productSelect.selectedOptions[0].dataset.stock);
+
+      if (!productId || quantity < 1) return alert("Invalid quantity");
+      if (quantity > stock) return alert("Not enough stock");
+
+      const res = await fetch("/.netlify/functions/add-sale", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ product_id: productId, quantity })
+      });
+      const data = await res.json();
+      if (!res.ok) return alert(data.error);
+
+      saleQty.value = "";
+      loadProducts();
+      loadSales();
+    });
+
+    loadProducts();
+    loadSales();
+  </script>
+</body>
+</html>
