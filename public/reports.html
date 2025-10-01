@@ -92,10 +92,15 @@
         const res = await fetch("/.netlify/functions/get-products", {
           headers: { "Authorization": `Bearer ${token}` }
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to fetch products");
 
-        // Populate product filter dropdown
+        const contentType = res.headers.get("content-type");
+        if (!res.ok || !contentType?.includes("application/json")) {
+          const text = await res.text();
+          console.error("Failed to load products:", text);
+          throw new Error("Failed to fetch products");
+        }
+
+        const data = await res.json();
         data.products.forEach(p => {
           const option = document.createElement("option");
           option.value = p.name;
@@ -119,18 +124,34 @@
         const res = await fetch(url, {
           headers: { "Authorization": `Bearer ${token}` }
         });
+
+        const contentType = res.headers.get("content-type");
+        if (!res.ok || !contentType?.includes("application/json")) {
+          const text = await res.text();
+          console.error("Fetch failed or invalid JSON:", text);
+          throw new Error("Failed to fetch report data");
+        }
+
         const data = await res.json();
+
+        // Ensure numeric values
+        data.totalRevenue = Number(data.totalRevenue) || 0;
+        data.products.forEach(p => {
+          p.total_sold = Number(p.total_sold) || 0;
+          p.total_revenue = Number(p.total_revenue) || 0;
+        });
+
         reportData = data;
 
         // Populate table
         reportTable.innerHTML = "";
-        totalRevenueEl.textContent = data.totalRevenue.toFixed(2);
+        totalRevenueEl.textContent = data.totalRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         data.products.forEach(p => {
           const row = document.createElement("tr");
           row.innerHTML = `
             <td>${p.name}</td>
-            <td>${p.total_sold}</td>
-            <td>₱${p.total_revenue.toFixed(2)}</td>
+            <td>${p.total_sold.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td>₱${p.total_revenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
           `;
           reportTable.appendChild(row);
         });
@@ -143,11 +164,9 @@
     }
 
     function renderCharts(products) {
-      // Destroy previous charts if they exist
       if (window.revenueChartInstance) window.revenueChartInstance.destroy();
       if (window.quantityChartInstance) window.quantityChartInstance.destroy();
 
-      // Bar Chart
       const revenueCtx = document.getElementById('revenueChart').getContext('2d');
       window.revenueChartInstance = new Chart(revenueCtx, {
         type: 'bar',
@@ -171,7 +190,6 @@
         }
       });
 
-      // Pie Chart
       const quantityCtx = document.getElementById('quantityChart').getContext('2d');
       window.quantityChartInstance = new Chart(quantityCtx, {
         type: 'pie',
@@ -191,7 +209,6 @@
       });
     }
 
-    // Filter button
     filterBtn.addEventListener("click", () => {
       const start = startDateInput.value;
       const end = endDateInput.value;
@@ -199,13 +216,17 @@
       loadReport(start, end, productName);
     });
 
-    // CSV Export
+    // Enhanced CSV Export with formatted numbers
     exportBtn.addEventListener("click", () => {
       if (!reportData || !reportData.products) return alert("No data to export.");
+
+      const formatNumber = (num) => Number(num).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
       let csv = "Product,Total Sold,Total Revenue\n";
       reportData.products.forEach(p => {
-        csv += `${p.name},${p.total_sold},${p.total_revenue.toFixed(2)}\n`;
+        csv += `${p.name},${formatNumber(p.total_sold)},${formatNumber(p.total_revenue)}\n`;
       });
+
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -215,7 +236,6 @@
       URL.revokeObjectURL(url);
     });
 
-    // Initial load
     loadProductsForFilter();
     loadReport();
   </script>

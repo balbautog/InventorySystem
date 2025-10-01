@@ -5,7 +5,13 @@ const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 exports.handler = async (event) => {
   try {
     const authHeader = event.headers.authorization;
-    if (!authHeader) return { statusCode: 401, body: "Unauthorized" };
+    if (!authHeader) {
+      return {
+        statusCode: 401,
+        body: JSON.stringify({ error: "Unauthorized" })
+      };
+    }
+
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, JWT_SECRET);
 
@@ -35,14 +41,27 @@ exports.handler = async (event) => {
 
     await client.end();
 
+    // Convert numeric strings to numbers
+    const products = res.rows.map(p => ({
+      name: p.name,
+      total_sold: Number(p.total_sold) || 0,
+      total_revenue: Number(p.total_revenue) || 0
+    }));
+
+    const totalRevenue = Number(totalRes.rows[0].total_revenue) || 0;
+
     return {
       statusCode: 200,
       body: JSON.stringify({
-        products: res.rows,
-        totalRevenue: totalRes.rows[0].total_revenue || 0
+        products,
+        totalRevenue
       })
     };
   } catch (err) {
-    return { statusCode: 401, body: JSON.stringify({ error: err.message }) };
+    console.error(err);
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ error: err.message || "Failed to fetch report" })
+    };
   }
 };
