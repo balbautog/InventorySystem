@@ -74,7 +74,7 @@
           row.innerHTML = `
             <td>${p.name}</td>
             <td>${p.total_sold}</td>
-            <td>₱${p.total_revenue.toFixed(2)}</td>
+            <td>₱${(Number(p.total_revenue) || 0).toFixed(2)}</td>
           `;
           reportTable.appendChild(row);
         });
