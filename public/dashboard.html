@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #000;
+      color: #fff;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      padding: 20px;
+      border-bottom: 1px solid #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    nav a {
+      color: #fff;
+      text-decoration: none;
+      margin-left: 15px;
+      font-weight: bold;
+    }
+    nav a:hover {
+      color: #ddd;
+    }
+    main {
+      padding: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #fff;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background: #111;
+    }
+    button {
+      background: #fff;
+      color: #000;
+      border: none;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover {
+      background: #ddd;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Dashboard</h1>
+    <nav>
+      <a href="inventory.html">Inventory</a>
+      <a href="sales.html">Sales</a>
+      <a href="reports.html">Reports</a>
+      <a href="#" id="logoutBtn">Logout</a>
+    </nav>
+  </header>
+
+  <main>
+    <h2 id="welcomeMessage">Welcome!</h2>
+    <h3>Products</h3>
+    <table id="productsTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Price</th>
+          <th>Stock</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Products will be loaded here -->
+      </tbody>
+    </table>
+  </main>
+
+  <script>
+    const token = localStorage.getItem("token");
+    const welcomeMessage = document.getElementById("welcomeMessage");
+    const productsTable = document.getElementById("productsTable").querySelector("tbody");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    if (!token) {
+      window.location.href = "/login.html";
+    }
+
+    // Decode JWT to get username (simple parse)
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    welcomeMessage.textContent = `Welcome, ${payload.username}!`;
+
+    // Fetch products from serverless function
+    async function loadProducts() {
+      try {
+        const res = await fetch("/.netlify/functions/get-products", {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to fetch products");
+
+        productsTable.innerHTML = "";
+        data.products.forEach(p => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${p.id}</td>
+            <td>${p.name}</td>
+            <td>${p.price}</td>
+            <td>${p.stock}</td>
+          `;
+          productsTable.appendChild(row);
+        });
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    loadProducts();
+
+    // Logout
+    logoutBtn.addEventListener("click", () => {
+      localStorage.removeItem("token");
+      window.location.href = "/login.html";
+    });
+  </script>
+</body>
+</html>
